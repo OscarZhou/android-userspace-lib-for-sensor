@@ -42,7 +42,7 @@
 #include <hardware/qemud.h>
 /** SENSOR IDS AND NAMES
  **/
-#define MAX_NUM_SENSORS 5
+#define MAX_NUM_SENSORS 3
 #define SUPPORTED_SENSORS  ((1<<MAX_NUM_SENSORS)-1)
 #define  ID_BASE           SENSORS_HANDLE_BASE
 #define  ID_ACCELERATION   (ID_BASE+0)
@@ -134,7 +134,7 @@ control__activate(struct sensors_poll_device_1 *dev,
     D("oscar write 3 %s: handle=%s (%d) fd=%d enabled=%d", __FUNCTION__,
         _sensorIdToName(handle), handle, ctl->fd, enabled);
     if (!ID_CHECK(handle)) {
-        E("oscar write 4%s: bad handle ID", __FUNCTION__);
+        E("oscar write 4 %s: bad handle ID", __FUNCTION__);
         return -1;
     }
     mask    = (1<<handle);
@@ -151,7 +151,7 @@ control__activate(struct sensors_poll_device_1 *dev,
     }
     ret = qemud_channel_send(ctl->fd, command, -1);
     if (ret < 0) {
-        E("oscar write 5 %s: when sending command errno=%d: %s", __FUNCTION__, errno, strerror(errno));
+        E("oscar write 6 %s: when sending command errno=%d: %s", __FUNCTION__, errno, strerror(errno));
         return -1;
     }
     ctl->active_sensors = new_sensors;
@@ -236,6 +236,7 @@ pick_sensor(SensorPoll*       data,
 {
 	D("oscar read 2 %s: ", __FUNCTION__);
     uint32_t mask = SUPPORTED_SENSORS;
+    D("oscar read 13 %b: ", __FUNCTION__, mask);
     while (mask) {
         uint32_t i = 31 - __builtin_clz(mask);
         mask &= ~(1<<i);
@@ -243,6 +244,7 @@ pick_sensor(SensorPoll*       data,
             data->pendingSensors &= ~(1<<i);
             *values = data->sensors[i];
             values->sensor = i;
+            D("oscar read 14 sensor index= %d: ", __FUNCTION__, i);
             values->version = sizeof(*values);
             D("oscar read 3 %s: %d [%f, %f, %f]", __FUNCTION__,
                     i,
@@ -262,7 +264,7 @@ data__poll(struct sensors_poll_device_1 *dev, sensors_event_t* values)
 {
     SensorPoll*  data = (void*)dev;
     int fd = data->events_fd;
-    D("oscar read 1 %s: data=%p", __FUNCTION__, dev);
+    //D("oscar read 1 %s: data=%p", __FUNCTION__, dev);
     // there are pending sensors, returns them now...
     if (data->pendingSensors) {
         return pick_sensor(data, values);
@@ -282,7 +284,7 @@ data__poll(struct sensors_poll_device_1 *dev, sensors_event_t* values)
 	int result = 0;
     /****************************************************************/
     while (1) {
-	    D("oscar read 4 %s: filename=%d", __FUNCTION__, file_name);
+	    //D("oscar read 4 %s: filename=%d", __FUNCTION__, file_name);
         /* read the next event */
         char     buff[256];
         int      len = qemud_channel_recv(data->events_fd, buff, sizeof buff-1);
@@ -309,15 +311,20 @@ data__poll(struct sensors_poll_device_1 *dev, sensors_event_t* values)
 			exit(1);
 		}
 		
-		D("oscar read 5 %s: output=%s", __FUNCTION__, output);
+		//D("oscar read 5 %s: output=%s", __FUNCTION__, output);
 		char output1[256] = {0};
 		char output2[256] = {0};
 		char output3[256] = {0};
 		int output_value[9] = {0};
 		
+		
+		D("oscar read 9 %s: sscanf=%d ", __FUNCTION__, sscanf(output, "%s %s %s", output1, output2, output3));
 		if (sscanf(output, "%s %s %s", output1, output2, output3) == 3) 
 		{
-			D("oscar read 6 %s: output1=%s, output2=%s, output3=%s", __FUNCTION__, output1, output2, output3);
+			//D("oscar read 6 %s: output1=%s, output2=%s, output3=%s", __FUNCTION__, output1, output2, output3);
+			//D("oscar read 10 %s: sscanf=%d output1=%s", __FUNCTION__, sscanf(output1, "acceleration:%d:%d:%d", output_value+0, output_value+1, output_value+2), output1);
+			//D("oscar read 11 %s: sscanf=%d output2=%s", __FUNCTION__, sscanf(output2, "magnetic:%d:%d:%d", output_value+3, output_value+4, output_value+5), output2);
+			//D("oscar read 12 %s: sscanf=%d output3=%s", __FUNCTION__, sscanf(output3, "gyroscope:%d:%d:%d", output_value+6, output_value+7, output_value+8), output3);
 			/* "acceleration:<x>:<y>:<z>" corresponds to an acceleration event */
 			if (sscanf(output1, "acceleration:%d:%d:%d", output_value+0, output_value+1, output_value+2) == 3) {
 		        new_sensors |= SENSORS_ACCELERATION;
@@ -325,7 +332,7 @@ data__poll(struct sensors_poll_device_1 *dev, sensors_event_t* values)
 		        data->sensors[ID_ACCELERATION].acceleration.y = output_value[1];
 		        data->sensors[ID_ACCELERATION].acceleration.z = output_value[2];
 		        data->sensors[ID_ACCELERATION].type = SENSOR_TYPE_ACCELEROMETER;
-  	      	}
+      		}
   	        /* "magnetic:<x>:<y>:<z>" is sent for the params of the magnetic field */
 		    if (sscanf(output2, "magnetic:%d:%d:%d", output_value+3, output_value+4, output_value+5) == 3) {
 		        new_sensors |= SENSORS_MAGNETIC_FIELD;
@@ -348,7 +355,7 @@ data__poll(struct sensors_poll_device_1 *dev, sensors_event_t* values)
 		    break;
 		}
 		/****************************************************************/
-        
+        /*
         if (sscanf(buff, "acceleration:%g:%g:%g", params+0, params+1, params+2) == 3) {
             new_sensors |= SENSORS_ACCELERATION;
             data->sensors[ID_ACCELERATION].acceleration.x = params[0];
@@ -366,16 +373,18 @@ data__poll(struct sensors_poll_device_1 *dev, sensors_event_t* values)
             data->sensors[ID_ACCELERATION].type = SENSOR_TYPE_MAGNETIC_FIELD;
             continue;
         }
+        */
         /* "sync:<time>" is sent after a series of sensor events.
          * where 'time' is expressed in micro-seconds and corresponds
          * to the VM time when the real poll occured.
          */
+         /*
         if (sscanf(buff, "sync:%lld", &event_time) == 1) {
             if (new_sensors) {
                 data->pendingSensors = new_sensors;
                 int64_t t = event_time * 1000LL;  /* convert to nano-seconds */
                 /* use the time at the first sync: as the base for later
-                 * time values */
+                 * time values *//*
                 if (data->timeStart == 0) {
                     data->timeStart  = data__now_ns();
                     data->timeOffset = data->timeStart - t;
@@ -392,6 +401,7 @@ data__poll(struct sensors_poll_device_1 *dev, sensors_event_t* values)
             }
             continue;
         }
+        */
         D("huh ? unsupported command");
     }
     
@@ -433,9 +443,9 @@ static int poll__poll(struct sensors_poll_device_1 *dev,
     int i;
     D("%s: dev=%p data=%p count=%d ", __FUNCTION__, dev, data, count);
 	
-	ret = data__poll(dev, data);
+	//ret = data__poll(dev, data);
 
-	/*
+	
     for (i = 0; i < count; i++)  {
         ret = data__poll(dev, data);
         data++;
@@ -446,7 +456,7 @@ static int poll__poll(struct sensors_poll_device_1 *dev,
            return i + 1;
         }
     }
-    */
+    
     return count;
 }
 static int poll__activate(struct sensors_poll_device_1 *dev,
@@ -455,7 +465,7 @@ static int poll__activate(struct sensors_poll_device_1 *dev,
     int ret;
     native_handle_t* hdl;
     SensorPoll*  ctl = (void*)dev;
-    D("%s: dev=%p handle=%x enable=%d ", __FUNCTION__, dev, handle, enabled);
+    D("oscar write 5 %s: dev=%p handle=%x enable=%d ", __FUNCTION__, dev, handle, enabled);
     if (ctl->fd < 0) {
         D("%s: OPEN CTRL and DATA ", __FUNCTION__);
         hdl = control__open_data_source(dev);

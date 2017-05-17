@@ -14,7 +14,6 @@ int main(){
     int write_str=2;
 
     printf("----begin main------\n");
-	module = (hw_module_t *)malloc(sizeof(hw_module_t));
     if(hw_get_module(SENSORS_HARDWARE_MODULE_ID,(struct hw_module_t const **)&module)==0)	
     {
         printf("get module sucess\n");
@@ -30,20 +29,15 @@ int main(){
         return -2;
     }
     struct sensors_poll_device_1* dev = (struct sensors_poll_device_1 *)device;
-    event = (sensors_event_t*)malloc(sizeof(sensors_event_t));
-    dev->poll(dev, event, 1);
+    event = (sensors_event_t*)malloc(sizeof(event));
+    dev->poll(dev, event, 2);
 	printf("acceleration.x = %.2f\n", event->data[0]/255.00);
 	printf("acceleration.y = %.2f\n", event->data[1]/255.00);
 	printf("acceleration.z = %.2f\n", event->data[2]/255.00);    
-    printf("magnetic.x = %.2f\n", event++->data[0]/255.00);
-	printf("magnetic.y = %.2f\n", event++->data[1]/255.00);
-	printf("magnetic.z = %.2f\n", event++->data[2]/255.00);  
-	printf("acceleration.x = %.2f\n", event->acceleration.x/255.00);
-	printf("acceleration.y = %.2f\n", event->acceleration.y/255.00);
-	printf("acceleration.z = %.2f\n", event->acceleration.z/255.00);
-	
     
-    dev->activate(dev, write_str, 7);
+    
+    
+    dev->activate(dev, write_str, 1);
     printf("write data: %d\n",write_str);
     
     
@@ -55,7 +49,5 @@ int main(){
 	
 	sensors_close_1(dev);
     printf("----end main------\n");
-    free(module);
-    free(event);
     return 0;
 }
