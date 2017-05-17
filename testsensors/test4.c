@@ -17,7 +17,8 @@ int main(){
 	int handler3 = 2;
 	
     printf("----begin main------\n");
-	module = (hw_module_t *)malloc(sizeof(hw_module_t));
+	//module = (hw_module_t *)malloc(sizeof(hw_module_t));
+	//device = (hw_device_t *)malloc(sizeof(hw_device_t));
     if(hw_get_module(SENSORS_HARDWARE_MODULE_ID,(struct hw_module_t const **)&module)==0)	
     {
         printf("get module sucess\n");
@@ -75,33 +76,39 @@ int main(){
     {
 		if((event+i)->type == SENSOR_TYPE_ACCELEROMETER)
 		{
-			printf("acceleration.x = %.2f\n", (event+i)->acceleration.x);
-			printf("acceleration.y = %.2f\n", (event+i)->acceleration.y);
-			printf("acceleration.z = %.2f\n", (event+i)->acceleration.z); 
+			printf("AFTER: acceleration.x = %.2f\n", (event+i)->acceleration.x);
+			printf("AFTER: acceleration.y = %.2f\n", (event+i)->acceleration.y);
+			printf("AFTER: acceleration.z = %.2f\n", (event+i)->acceleration.z); 
 			continue;
 		}
 		if((event+i)->type == SENSOR_TYPE_MAGNETIC_FIELD)
 		{
-			printf("magnetic.x = %.2f\n", (event+i)->magnetic.x);
-			printf("magnetic.y = %.2f\n", (event+i)->magnetic.y);
-			printf("magnetic.z = %.2f\n", (event+i)->magnetic.z);  
+			printf("AFTER: magnetic.x = %.2f\n", (event+i)->magnetic.x);
+			printf("AFTER: magnetic.y = %.2f\n", (event+i)->magnetic.y);
+			printf("AFTER: magnetic.z = %.2f\n", (event+i)->magnetic.z);  
 			continue;
 		}
 		if((event+i)->type == SENSOR_TYPE_GYROSCOPE)
 		{
-			printf("gyroscope.x = %.2f\n", (event+i)->gyro.x);
-			printf("gyroscope.y = %.2f\n", (event+i)->gyro.y);
-			printf("gyroscope.z = %.2f\n", (event+i)->gyro.z); 
+			printf("AFTER: gyroscope.x = %.2f\n", (event+i)->gyro.x);
+			printf("AFTER: gyroscope.y = %.2f\n", (event+i)->gyro.y);
+			printf("AFTER: gyroscope.z = %.2f\n", (event+i)->gyro.z); 
 			continue;
 		}
 		
     }
 	
-    
-    free(event);
-	sensors_close_1(dev);
-    free(module);
-    printf("----end main------\n");
 
+    free(event);
+    event = NULL;
+	//free(device);
+	//device = NULL;
+    
+
+	sensors_close_1(dev);
+	printf("----end main------\n");
+  
+  	//free(module);
+    //module = NULL;
     return 0;
 }
