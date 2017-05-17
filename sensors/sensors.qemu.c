@@ -33,6 +33,8 @@
 #include <cutils/sockets.h>
 #include <hardware/sensors.h>
 
+#include <inttypes.h>
+
 #if 1
 #define  D(...)  ALOGD(__VA_ARGS__)
 #else
@@ -52,7 +54,7 @@
 
 #define  SENSORS_ACCELERATION   (1 << ID_ACCELERATION)
 #define  SENSORS_MAGNETIC_FIELD  (1 << ID_MAGNETIC_FIELD)
-#define  SENSORS_GYROSCOPE     (1 << ID_GYROSCOPE)
+#define  SENSOR_TYPE_GYROSCOPE     (1 << ID_GYROSCOPE)
 
 #define  ID_CHECK(x)  ((unsigned)((x)-ID_BASE) < MAX_NUM_SENSORS)
 #define  SENSORS_LIST  \
@@ -61,6 +63,10 @@
     SENSOR_(GYROSCOPE,"gyroscope") \
 
 #define DEVICENAME	"/dev/goldfish_sensor"
+typedef struct output_t{
+	char output[256];
+}output_t;
+
 
 static const struct {
     const char*  name;
@@ -131,10 +137,10 @@ control__activate(struct sensors_poll_device_1 *dev,
     uint32_t        mask, sensors, active, new_sensors, changed;
     char            command[128];
     int             ret;
-    D("oscar write 3 %s: handle=%s (%d) fd=%d enabled=%d", __FUNCTION__,
+    D("oscarwrite 3 %s: handle=%s (%d) fd=%d enabled=%d", __FUNCTION__,
         _sensorIdToName(handle), handle, ctl->fd, enabled);
     if (!ID_CHECK(handle)) {
-        E("oscar write 4 %s: bad handle ID", __FUNCTION__);
+        E("oscarwrite 4 %s: bad handle ID", __FUNCTION__);
         return -1;
     }
     mask    = (1<<handle);
@@ -160,17 +166,17 @@ control__activate(struct sensors_poll_device_1 *dev,
     int file_name = open(DEVICENAME, O_WRONLY);
 	if(file_name<0)
 	{
-		D("oscar write 1 %s: file %d cannot be opened ", __FUNCTION__, file_name);
+		D("oscarwrite 1 %s: file %d cannot be opened ", __FUNCTION__, file_name);
 		exit(1);
 	}
 
 	int result = 0;
 	
 	D("oscar %s: file name=%d ", __FUNCTION__, file_name);
-    result = write(file_name, &enabled, sizeof(enabled));
+    result = write(file_name, &new_sensors, sizeof(new_sensors));
 	if(result<0)
 	{
-		D("oscar write 2 %s: result=%d", __FUNCTION__, result);
+		D("oscarwrite 2 %s: result=%d", __FUNCTION__, result);
 		close(file_name);
 		exit(1);
 	}
@@ -234,19 +240,41 @@ static int
 pick_sensor(SensorPoll*       data,
             sensors_event_t*  values)
 {
-	D("oscar read 2 %s: ", __FUNCTION__);
+	D("oscarread 2 %s: ", __FUNCTION__);
     uint32_t mask = SUPPORTED_SENSORS;
-    D("oscar read 13 %b: ", __FUNCTION__, mask);
+    D("oscarread 13 %u: ", __FUNCTION__, mask);
     while (mask) {
         uint32_t i = 31 - __builtin_clz(mask);
+        
+        D("oscarread 14 i= %u ", __FUNCTION__, i);
         mask &= ~(1<<i);
+        D("oscarread 20 %s data->pendingSensors= %u, (1<<i) = %d", __FUNCTION__, data->pendingSensors, (1<<i));
         if (data->pendingSensors & (1<<i)) {
             data->pendingSensors &= ~(1<<i);
             *values = data->sensors[i];
             values->sensor = i;
-            D("oscar read 14 sensor index= %d: ", __FUNCTION__, i);
+            if(i == ID_GYROSCOPE)
+            {
+            	values->gyro.x = values->data[0];
+            	values->gyro.y = values->data[1];
+            	values->gyro.z = values->data[2];
+            }
+            else if(i == ID_MAGNETIC_FIELD)
+            {
+            	values->magnetic.x = values->data[0];
+            	values->magnetic.y = values->data[1];
+            	values->magnetic.z = values->data[2];
+            }
+            else if(i == ID_ACCELERATION)
+            {
+            	values->acceleration.x = values->data[0];
+            	values->acceleration.y = values->data[1];
+            	values->acceleration.z = values->data[2];
+            }
+            
+            D("oscarread 14 sensor index= %u: ", __FUNCTION__, i);
             values->version = sizeof(*values);
-            D("oscar read 3 %s: %d [%f, %f, %f]", __FUNCTION__,
+            D("oscarread3 %s: %d [%f, %f, %f]", __FUNCTION__,
                     i,
                     values->data[0],
                     values->data[1],
@@ -276,7 +304,7 @@ data__poll(struct sensors_poll_device_1 *dev, sensors_event_t* values)
     int file_name = open(DEVICENAME, O_RDONLY);
     if(file_name<0)
 	{
-		D("oscar read 7 %s: file %d cannot be opened ", __FUNCTION__, file_name);
+		D("oscarread 7 %s: file %d cannot be opened ", __FUNCTION__, file_name);
 		exit(1);
 	}
 	
@@ -299,6 +327,7 @@ data__poll(struct sensors_poll_device_1 *dev, sensors_event_t* values)
         buff[len] = 0;
         /* "wake" is sent from the emulator to exit this loop. */
         if (!strcmp((const char*)data, "wake")) {
+        	close(file_name);
             return 0x7FFFFFFF;
         }
         
@@ -312,48 +341,55 @@ data__poll(struct sensors_poll_device_1 *dev, sensors_event_t* values)
 		}
 		
 		//D("oscar read 5 %s: output=%s", __FUNCTION__, output);
-		char output1[256] = {0};
-		char output2[256] = {0};
-		char output3[256] = {0};
+		output_t * p_output = (output_t*)malloc(sizeof(output_t)*3);
 		int output_value[9] = {0};
 		
 		
-		D("oscar read 9 %s: sscanf=%d ", __FUNCTION__, sscanf(output, "%s %s %s", output1, output2, output3));
-		if (sscanf(output, "%s %s %s", output1, output2, output3) == 3) 
-		{
-			//D("oscar read 6 %s: output1=%s, output2=%s, output3=%s", __FUNCTION__, output1, output2, output3);
-			//D("oscar read 10 %s: sscanf=%d output1=%s", __FUNCTION__, sscanf(output1, "acceleration:%d:%d:%d", output_value+0, output_value+1, output_value+2), output1);
-			//D("oscar read 11 %s: sscanf=%d output2=%s", __FUNCTION__, sscanf(output2, "magnetic:%d:%d:%d", output_value+3, output_value+4, output_value+5), output2);
-			//D("oscar read 12 %s: sscanf=%d output3=%s", __FUNCTION__, sscanf(output3, "gyroscope:%d:%d:%d", output_value+6, output_value+7, output_value+8), output3);
-			/* "acceleration:<x>:<y>:<z>" corresponds to an acceleration event */
-			if (sscanf(output1, "acceleration:%d:%d:%d", output_value+0, output_value+1, output_value+2) == 3) {
-		        new_sensors |= SENSORS_ACCELERATION;
-		        data->sensors[ID_ACCELERATION].acceleration.x = output_value[0];
-		        data->sensors[ID_ACCELERATION].acceleration.y = output_value[1];
-		        data->sensors[ID_ACCELERATION].acceleration.z = output_value[2];
+		//D("oscarread 9 %s: sscanf=%d ", __FUNCTION__, sscanf(output, "%s %s %s", output1, output2, output3));
+		sscanf(output, "%s %s %s", p_output->output, (p_output+1)->output, (p_output+2)->output);
+		int i = 0;
+		for(i=0; i<3; i++)
+		{	
+			if (sscanf((p_output+i)->output, "acceleration:%d:%d:%d", output_value+0, output_value+1, output_value+2) == 3)
+			{
+				new_sensors |= SENSORS_ACCELERATION;
+		        data->sensors[ID_ACCELERATION].acceleration.x = (float)*(output_value+0)/255.0;
+		        data->sensors[ID_ACCELERATION].acceleration.y = (float)*(output_value+1)/255.0;
+		        data->sensors[ID_ACCELERATION].acceleration.z = (float)*(output_value+2)/255.0;
 		        data->sensors[ID_ACCELERATION].type = SENSOR_TYPE_ACCELEROMETER;
-      		}
-  	        /* "magnetic:<x>:<y>:<z>" is sent for the params of the magnetic field */
-		    if (sscanf(output2, "magnetic:%d:%d:%d", output_value+3, output_value+4, output_value+5) == 3) {
+				continue;
+			}
+			if (sscanf((p_output+i)->output, "magnetic:%d:%d:%d", output_value+3, output_value+4, output_value+5) == 3)
+			{
 		        new_sensors |= SENSORS_MAGNETIC_FIELD;
-		        data->sensors[ID_MAGNETIC_FIELD].magnetic.x = output_value[3];
-		        data->sensors[ID_MAGNETIC_FIELD].magnetic.y = output_value[4];
-		        data->sensors[ID_MAGNETIC_FIELD].magnetic.z = output_value[5];
+		        data->sensors[ID_MAGNETIC_FIELD].magnetic.x = (float)*(output_value+3)/255.0;
+		        data->sensors[ID_MAGNETIC_FIELD].magnetic.y = (float)*(output_value+4)/255.0;
+		        data->sensors[ID_MAGNETIC_FIELD].magnetic.z = (float)*(output_value+5)/255.0;
 		        data->sensors[ID_MAGNETIC_FIELD].magnetic.status = SENSOR_STATUS_ACCURACY_HIGH;
 		        data->sensors[ID_MAGNETIC_FIELD].type = SENSOR_TYPE_MAGNETIC_FIELD;
-		    }
-		    
-		    if (sscanf(output3, "gyroscope:%d:%d:%d", output_value+6, output_value+7, output_value+8) == 3) {
+				continue;
+			}
+			if (sscanf((p_output+i)->output, "acceleration:%d:%d:%d", output_value+6, output_value+7, output_value+8) == 3)
+			{
 		        new_sensors |= SENSORS_GYROSCOPE;
-		        data->sensors[ID_GYROSCOPE].gyro.x = output_value[6];
-		        data->sensors[ID_GYROSCOPE].gyro.y = output_value[7];
-		        data->sensors[ID_GYROSCOPE].gyro.z = output_value[8];
+		        data->sensors[ID_GYROSCOPE].gyro.x = (float)*(output_value+6)/255.0;
+		        data->sensors[ID_GYROSCOPE].gyro.y = (float)*(output_value+7)/255.0;
+		        data->sensors[ID_GYROSCOPE].gyro.z = (float)*(output_value+8)/255.0;
 		        data->sensors[ID_GYROSCOPE].gyro.status = SENSOR_STATUS_ACCURACY_HIGH;
-		        data->sensors[ID_GYROSCOPE].type = SENSOR_TYPE_MAGNETIC_FIELD;
-		    }
-		    pick_sensor(data, values);
-		    break;
+		        data->sensors[ID_GYROSCOPE].type = SENSOR_TYPE_GYROSCOPE;
+				continue;
+			}
 		}
+	
+		
+		if(new_sensors)
+		{
+			data->pendingSensors = new_sensors;
+			free(output_t);
+			close(file_name);
+			return pick_sensor(data, values);
+		}
+		break;
 		/****************************************************************/
         /*
         if (sscanf(buff, "acceleration:%g:%g:%g", params+0, params+1, params+2) == 3) {
@@ -402,9 +438,11 @@ data__poll(struct sensors_poll_device_1 *dev, sensors_event_t* values)
             continue;
         }
         */
+        
         D("huh ? unsupported command");
     }
-    
+    pick_sensor(data, values);
+    free(output_t);
 	close(file_name);
     return -1;
 }
@@ -445,8 +483,8 @@ static int poll__poll(struct sensors_poll_device_1 *dev,
 	
 	//ret = data__poll(dev, data);
 
-	
-    for (i = 0; i < count; i++)  {
+	int loop = 3;
+    for (i = 0; i < loop; i++)  {
         ret = data__poll(dev, data);
         data++;
         if (ret > MAX_NUM_SENSORS || ret < 0) {
@@ -465,7 +503,7 @@ static int poll__activate(struct sensors_poll_device_1 *dev,
     int ret;
     native_handle_t* hdl;
     SensorPoll*  ctl = (void*)dev;
-    D("oscar write 5 %s: dev=%p handle=%x enable=%d ", __FUNCTION__, dev, handle, enabled);
+    D("oscarwrite 5 %s: dev=%p handle=%x enable=%d ", __FUNCTION__, dev, handle, enabled);
     if (ctl->fd < 0) {
         D("%s: OPEN CTRL and DATA ", __FUNCTION__);
         hdl = control__open_data_source(dev);
