@@ -56,6 +56,7 @@ struct goldfish_sensor {
 	unsigned long buffer_phys;
 	
 	char __iomem *read_buffer;      /* read buffer virtual address */
+	int __iomem write_buffer;
 	int buffer_status;
 
 };
@@ -150,7 +151,7 @@ static ssize_t goldfish_sensor_read(struct file *fp, char __user *buf,
 	{	
 		memcpy(data->read_buffer, 0, READ_BUFFER_SIZE);
 	}
-	wait_event_interruptible(data->wait, data->buffer_status);  // turn irq
+	wait_event_interruptible(data->wait, (data->buffer_status & SENSOR_MASK));  // turn irq
 	result += READ_BUFFER_SIZE;	// Make sure that the result is READ_BUFFER_SIZE, otherwise release will be activited after this function
 
 	
