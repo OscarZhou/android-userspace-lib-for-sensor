@@ -1,46 +1,16 @@
-The part of compiling the necessary file
-In the directory : "~/WORKING_DIRECTORY"
-1. . build/envsetup.sh
-2. lunch full-eng
+Hello Prof. Martin,
 
-In the directory : "~/WORKING_DIRECTORY/device/generic/goldfish/sensors"
-1. mm ( only compile needed file)  or mma (compile all files which is timing consuming)
+The assignment2 requires us to submit only one file, but I changed some code in the assignment1, because the feedback of assignment 1 showed that I did not implement the enable/disable function, so in the assignment2, I finished it.
 
-(compiling test program for HAL layer)
-The same: but should note that the different path when input "mm"
-the directory should be your test program directory :  "~/WORKING_DIRECTORY/hardware/libhardware/tests/testsensors"
+In the "sensors_qemu.c" file, I implemented the data_poll() and control_activate() function, which is the reason why I have to modify some code in the kernel driver.
 
-(compiling test program for kernel layer)
-In the directory: "~/Downloads/ass1/"
-1. arm-none-linux-gnueabi-gcc -static test5.cpp -o test5
--------------------------------------------
+The app can displayed the correct data in acceleration sensor and magnetic sensor. But the time of starting up the system is very long in my laptop, and I am not sure if the same thing happened in your system.
 
-Push test program into emulator:
-In directory Anroid/Sdk/platform-tools:
-1. ./adb remount
-2. ./adb push ~/WORKING_DIRECTORY/out/target/product/generic/system/bin/test4 /dev
-3. ./adb push ~/Downloads/ass1/test5 /dev
 
--------------------------------------------
-The part of preparing the runtime:
-In directory Anroid/Sdk/platform-tools:
-1. ./adb remount
-2. ./adb push ~/WORKING_DIRECTORY/out/target/product/generic/obj/lib/sensors.goldfish.so /system/lib/hw
-3. ./adb shell
+The version of the sensors.qemu.c file I downloaded is the android-5.1.0_r5.
 
-In the root directory:
-4. stop
-5. chmod 777 dev/goldfish_sensor
-6. echo 0 > /sys/fs/selinux/enforce
-7. start
+Best regards,
 
-(check the permission part)
-.1 go to directory /dev: ll, to see if the permission of the file "goldfish_sensor" changes
-.2 go to directory /system/lib/hw: ll to see if the date of the file "sensors_goldfish.so" is the latest one
+Hongyu ZHOU (Oscar)
 
-Go to directory /system/lib/hw
-8. logcat | grep oscar
-9. wait the emulator completely startup
 
---------------------------------------------
-6. run the app. 
