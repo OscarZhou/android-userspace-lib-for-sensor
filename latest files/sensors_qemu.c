@@ -117,13 +117,11 @@ typedef struct SensorPoll {
 static native_handle_t*
 control__open_data_source(struct sensors_poll_device_1 *dev)
 {
-	D("oscar function entry %s ", __FUNCTION__);
     SensorPoll*  ctl = (void*)dev;
     native_handle_t* handle;
     if (ctl->fd < 0) {
         ctl->fd = qemud_channel_open(SENSORS_SERVICE_NAME);
     }
-    D("oscar %s: fd=%d", __FUNCTION__, ctl->fd);
     handle = native_handle_create(1, 0);
     handle->data[0] = dup(ctl->fd);
     return handle;
@@ -133,12 +131,18 @@ control__activate(struct sensors_poll_device_1 *dev,
                   int handle,
                   int enabled)
 {
-	D("oscar function entry %s ", __FUNCTION__);
     SensorPoll*     ctl = (void*)dev;
     uint32_t        mask, sensors, active, new_sensors, changed;
     char            command[128];
     int             ret;
-    D("oscarwrite 3 %s: handle=%s (%d) fd=%d enabled=%d", __FUNCTION__,
+    
+    int file_name = open(DEVICENAME, O_RDWR);
+	if(file_name<0)
+	{
+		exit(1);
+	}
+    
+    D("%s: handle=%s (%d) fd=%d enabled=%d", __FUNCTION__,
         _sensorIdToName(handle), handle, ctl->fd, enabled);
     if (!ID_CHECK(handle)) {
         E("oscarwrite 4 %s: bad handle ID", __FUNCTION__);
@@ -151,6 +155,19 @@ control__activate(struct sensors_poll_device_1 *dev,
     changed     = active ^ new_sensors;
     if (!changed)
         return 0;
+        
+        
+    D("oscar %s: new_sensors=%08x ", __FUNCTION__, new_sensors);
+    result = write(file_name, &new_sensors, sizeof(new_sensors));
+	if(result<0)
+	{
+		D("oscarwrite 2 %s: result=%d", __FUNCTION__, result);
+		close(file_name);
+		exit(1);
+	}
+     
+	close(file_name);
+	    
     snprintf(command, sizeof command, "set:%s:%d",
                 _sensorIdToName(handle), enabled != 0);
     if (ctl->fd < 0) {
@@ -187,7 +204,7 @@ control__activate(struct sensors_poll_device_1 *dev,
      
 	close(file_name);
     /********************************************************************/
-    
+    ctl->active_sensors = new_sensors;
     D("oscar function exit %s ", __FUNCTION__);
     return 0;
 }
@@ -375,18 +392,18 @@ data__poll(struct sensors_poll_device_1 *dev, sensors_event_t* values)
 			if (sscanf((p_output+i)->output, "acceleration:%d:%d:%d", output_value+0, output_value+1, output_value+2) == 3)
 			{
 				new_sensors |= SENSORS_ACCELERATION;
-		        data->sensors[ID_ACCELERATION].acceleration.x = (float)*(output_value+0)/255.0;
-		        data->sensors[ID_ACCELERATION].acceleration.y = (float)*(output_value+1)/255.0;
-		        data->sensors[ID_ACCELERATION].acceleration.z = (float)*(output_value+2)/255.0;
+		        data->sensors[ID_ACCELERATION].acceleration.x = (float)*(output_value+0)/256.0;
+		        data->sensors[ID_ACCELERATION].acceleration.y = (float)*(output_value+1)/256.0;
+		        data->sensors[ID_ACCELERATION].acceleration.z = (float)*(output_value+2)/256.0;
 		        data->sensors[ID_ACCELERATION].type = SENSOR_TYPE_ACCELEROMETER;
 				continue;
 			}
 			if (sscanf((p_output+i)->output, "magnetic:%d:%d:%d", output_value+3, output_value+4, output_value+5) == 3)
 			{
 		        new_sensors |= SENSORS_MAGNETIC_FIELD;
-		        data->sensors[ID_MAGNETIC_FIELD].magnetic.x = (float)*(output_value+3)/255.0;
-		        data->sensors[ID_MAGNETIC_FIELD].magnetic.y = (float)*(output_value+4)/255.0;
-		        data->sensors[ID_MAGNETIC_FIELD].magnetic.z = (float)*(output_value+5)/255.0;
+		        data->sensors[ID_MAGNETIC_FIELD].magnetic.x = (float)*(output_value+3)/256.0;
+		        data->sensors[ID_MAGNETIC_FIELD].magnetic.y = (float)*(output_value+4)/256.0;
+		        data->sensors[ID_MAGNETIC_FIELD].magnetic.z = (float)*(output_value+5)/256.0;
 		        data->sensors[ID_MAGNETIC_FIELD].magnetic.status = SENSOR_STATUS_ACCURACY_HIGH;
 		        data->sensors[ID_MAGNETIC_FIELD].type = SENSOR_TYPE_MAGNETIC_FIELD;
 				continue;
@@ -394,9 +411,9 @@ data__poll(struct sensors_poll_device_1 *dev, sensors_event_t* values)
 			if (sscanf((p_output+i)->output, "gyroscope:%d:%d:%d", output_value+6, output_value+7, output_value+8) == 3)
 			{
 		        new_sensors |= SENSOR_TYPE_GYROSCOPE;
-		        data->sensors[ID_GYROSCOPE].gyro.x = (float)*(output_value+6)/255.0;
-		        data->sensors[ID_GYROSCOPE].gyro.y = (float)*(output_value+7)/255.0;
-		        data->sensors[ID_GYROSCOPE].gyro.z = (float)*(output_value+8)/255.0;
+		        data->sensors[ID_GYROSCOPE].gyro.x = (float)*(output_value+6)/256.0;
+		        data->sensors[ID_GYROSCOPE].gyro.y = (float)*(output_value+7)/256.0;
+		        data->sensors[ID_GYROSCOPE].gyro.z = (float)*(output_value+8)/256.0;
 		        data->sensors[ID_GYROSCOPE].gyro.status = SENSOR_STATUS_ACCURACY_HIGH;
 		        data->sensors[ID_GYROSCOPE].type = SENSOR_TYPE_GYROSCOPE;
 				continue;

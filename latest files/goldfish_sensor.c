@@ -182,7 +182,7 @@ static ssize_t goldfish_sensor_write(struct file *fp, const char __user *buf,
 		printk("copy_from_user failed!\n");
 		result = -EFAULT;
 	}
-	//GOLDFISH_SENSOR_WRITE(data, INT_ENABLE, data->buffer_status);
+	GOLDFISH_SENSOR_WRITE(data, INT_ENABLE, data->buffer_status);
 	spin_unlock_irqrestore(&data->lock, irq_flags);
 	result += WRITE_BUFFER_SIZE;
 	return result;
@@ -234,7 +234,7 @@ static irqreturn_t goldfish_sensor_interrupt(int irq, void *dev_id)
 	/* read buffer status flags */
 	status = GOLDFISH_SENSOR_READ(data, INT_ENABLE);
 	//the buffer_status is determined by userspace, even if the the device offer the data of certain sensor which is disabled by userspace, the kernel won't response.
-	status &= data->buffer_status; 	
+	//status &= data->buffer_status; 	
 
 	/* if buffers are newly empty, wake up blocked goldfish_sensor_write() call */
 	if(status) {//check status
