@@ -109,11 +109,13 @@ static atomic_t open_count = ATOMIC_INIT(0);
 static ssize_t goldfish_sensor_read(struct file *fp, char __user *buf,
 							 loff_t *pos)
 {
+	
 	struct goldfish_sensor* data = fp->private_data;
 	int length;
 	int result = 0;
+	wait_event_interruptible(data->wait, (data->buffer_status & SENSOR_MASK));  // turn irq
 	
-	char temp_buffer[256];
+	char temp_buffer[256] = {0};
 	char temp_buffer1[256] = {0};
 	char temp_buffer2[256] = {0};
 	char temp_buffer3[256] = {0};
@@ -151,7 +153,6 @@ static ssize_t goldfish_sensor_read(struct file *fp, char __user *buf,
 	{	
 		memcpy(data->read_buffer, 0, READ_BUFFER_SIZE);
 	}
-	wait_event_interruptible(data->wait, (data->buffer_status & SENSOR_MASK));  // turn irq
 	result += READ_BUFFER_SIZE;	// Make sure that the result is READ_BUFFER_SIZE, otherwise release will be activited after this function
 
 	
@@ -173,14 +174,15 @@ static ssize_t goldfish_sensor_write(struct file *fp, const char __user *buf,
 	int result = 0;
 
 	/* copy from user space to the appropriate buffer */
-	spin_lock_irqsave(&data->lock, irq_flags);
 	
-
+	
+	spin_lock_irqsave(&data->lock, irq_flags);
 	if (copy_from_user(&(data->buffer_status), buf, WRITE_BUFFER_SIZE))
 	{
 		printk("copy_from_user failed!\n");
 		result = -EFAULT;
 	}
+	//GOLDFISH_SENSOR_WRITE(data, INT_ENABLE, data->buffer_status);
 	spin_unlock_irqrestore(&data->lock, irq_flags);
 	result += WRITE_BUFFER_SIZE;
 	return result;
